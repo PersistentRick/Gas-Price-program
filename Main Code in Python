@@ -1,0 +1,78 @@
+import requests
+import os
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+
+options = Options()
+options.add_argument('--headless')
+options.add_experimental_option('excludeSwitches', ['enable-logging'])
+
+driver = webdriver.Chrome(options=options)
+
+
+print("Checking for current gas prices...")
+def print_price_threshold(yen_rate, navy_base_price):
+    navy_base_price_per_liter = navy_base_price / 3.78541  # Convert gallon to liter
+    threshold_yen = navy_base_price_per_liter * yen_rate  # Convert USD to yen
+
+    print(f"\nIf off-base gas is ¥{threshold_yen:.2f} or lower, it is cheaper off base.")
+    print("If the off-base price is higher than this, it's cheaper on base.")
+
+
+# Set up options for a headless Chrome browser
+chrome_options = Options()
+chrome_options.add_argument("--headless")  # Enable headless mode
+
+# Set up WebDriver for Chrome with the headless options
+chromedriver_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chromedriver.exe')
+webdriver_service = Service(chromedriver_path)
+driver = webdriver.Chrome(service=webdriver_service, options=chrome_options)
+
+
+# Get the Navy base gas price
+url_gas = "https://www.afnpacific.net/gas-prices/"
+response_gas = requests.get(url_gas)
+soup_gas = BeautifulSoup(response_gas.content, 'html.parser')
+
+# Find the desired table element using CSS selector
+target_table = soup_gas.select_one("table:nth-of-type(3)")  # Select the third table element
+
+# Find the desired <td> element using CSS selector within the table
+target_td = target_table.select_one("tr:nth-of-type(4) td:nth-of-type(2)")  # Select the second <td> in the fourth row
+
+if target_td is None:
+    print("The desired <td> element was not found. Please try again later.")
+    exit()  # Stops the program
+
+# Extract the gas price from the target <td> element
+navy_base_price = float(target_td.text.strip().replace('$', ''))
+
+# Get the yen rate
+url_yen = "https://www.bk.mufg.jp/ippan/kinri/list_j/kinri/kawase.html"
+driver.get(url_yen)
+
+yen_rate_string = driver.find_element(By.ID, "G001CASB").text
+
+yen_rate = None
+try:
+    yen_rate = float(yen_rate_string)
+except ValueError:
+    print("The yen rate couldn't be obtained. Please try again later.")
+    driver.quit()
+    exit()  # Stops the program
+
+# Close the driver after getting the yen rate
+driver.quit()
+
+# Print the price threshold
+print_price_threshold(yen_rate, navy_base_price)
+
+print(f"Gas Price on base is ${navy_base_price:.3f}")
+print(f"Current Yen Rate is ¥{yen_rate:.2f}")
+print("\nPress Enter to close this window...")
+input()
